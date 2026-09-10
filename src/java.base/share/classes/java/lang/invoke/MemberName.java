@@ -23,6 +23,12 @@
  * questions.
  */
 
+/*
+ * ===========================================================================
+ * (c) Copyright IBM Corp. 2024, 2024 All Rights Reserved
+ * ===========================================================================
+ */
+
 package java.lang.invoke;
 
 import sun.invoke.util.BytecodeDescriptor;
@@ -1115,6 +1121,7 @@ import static java.lang.invoke.MethodHandleStatics.newInternalError;
                 return result;
             return null;
         }
+
         /** Return a list of all methods defined by the given class.
          *  Super types are searched (for inherited members) if {@code searchSupers} is true.
          *  Access checking is performed on behalf of the given {@code lookupClass}.
@@ -1178,6 +1185,13 @@ import static java.lang.invoke.MethodHandleStatics.newInternalError;
             for (int i = 0; i < length; i++)
                 buf[i] = new MemberName();
             return buf;
+        }
+    }
+
+    @Override
+    protected void finalize() {
+        if (null != clazz) {
+            MethodHandleNatives.markClassForMemberNamePruning(clazz);
         }
     }
 }
