@@ -664,9 +664,13 @@ class MethodHandleNatives {
         return (definingClass.isAssignableFrom(symbolicRefClass) ||  // Msym overrides Mdef
                 symbolicRefClass.isInterface());                     // Mdef implements Msym
     }
+<<<<<<< HEAD
 
     /**
      * Inform the VM that a MemberName belonging to class c has been collected.
      */
+=======
+    
+>>>>>>> 3064099b99 (Add MemberName finalizer to mark clazz for MemberName list pruning)
     static native void markClassForMemberNamePruning(Class<?> c);
 }

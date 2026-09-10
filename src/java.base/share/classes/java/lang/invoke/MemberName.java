@@ -1121,6 +1121,7 @@ import static java.lang.invoke.MethodHandleStatics.newInternalError;
                 return result;
             return null;
         }
+
         /** Return a list of all methods defined by the given class.
          *  Super types are searched (for inherited members) if {@code searchSupers} is true.
          *  Access checking is performed on behalf of the given {@code lookupClass}.
