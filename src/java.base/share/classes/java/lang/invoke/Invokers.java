@@ -287,7 +287,10 @@ class Invokers {
         int nameCursor = OUTARG_LIMIT;
         final int MTYPE_ARG    = customized ? -1 : nameCursor++;  // might be last in-argument
         final int CHECK_TYPE   = nameCursor++;
-        final int CHECK_CUSTOM = (CUSTOMIZE_THRESHOLD >= 0) ? nameCursor++ : -1;
+        // Omit the CHECK_CUSTOM Name node when customization is suppressed so
+        // the per-invocation checkCustomized() overhead is eliminated from the
+        // form entirely, not just made into a no-op inside maybeCustomize().
+        final int CHECK_CUSTOM = (CUSTOMIZE_THRESHOLD >= 0 && !SUPPRESS_CUSTOMIZATION) ? nameCursor++ : -1;
         final int LINKER_CALL  = nameCursor++;
         MethodType invokerFormType = mtype.invokerType();
         if (isLinker) {
@@ -577,6 +580,10 @@ class Invokers {
     /*non-public*/ static
     @DontInline
     void maybeCustomize(MethodHandle mh) {
+        // Under SUPPRESS_CUSTOMIZATION (e.g. -Xint experiments) skip entirely.
+        // The JIT is the sole beneficiary of per-MH LF customization; without it
+        // producing private LF copies is pure overhead.
+        if (SUPPRESS_CUSTOMIZATION) return;
         byte count = mh.customizationCount;
         if (count >= CUSTOMIZE_THRESHOLD) {
             mh.customize();

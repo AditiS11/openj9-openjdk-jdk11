@@ -39,6 +39,8 @@ import java.lang.reflect.Field;
 
 import static java.lang.invoke.MethodHandleNatives.Constants.*;
 import static java.lang.invoke.MethodHandleStatics.TRACE_METHOD_LINKAGE;
+import static java.lang.invoke.MethodHandleStatics.TRACE_LF_PREGENERATION;
+import static java.lang.invoke.MethodHandleStatics.CNT_LINK_CALL_SITE;
 import static java.lang.invoke.MethodHandles.Lookup.IMPL_LOOKUP;
 
 /**
@@ -246,6 +248,9 @@ class MethodHandleNatives {
                                    Object nameObj, Object typeObj,
                                    Object staticArguments,
                                    Object[] appendixResult) {
+        if (TRACE_LF_PREGENERATION) {
+            CNT_LINK_CALL_SITE.incrementAndGet();
+        }
         MethodHandle bootstrapMethod = (MethodHandle)bootstrapMethodObj;
         Class<?> caller = (Class<?>)callerObj;
         String name = nameObj.toString().intern();
