@@ -41,6 +41,7 @@ import java.util.Map;
 class GenerateJLIClassesHelper {
 
     static byte[] generateBasicFormsClassBytes(String className) {
+        System.err.println("[JLI_GEN] generateBasicFormsClassBytes class=" + className);
         ArrayList<LambdaForm> forms = new ArrayList<>();
         ArrayList<String> names = new ArrayList<>();
         HashSet<String> dedupSet = new HashSet<>();
@@ -68,6 +69,8 @@ class GenerateJLIClassesHelper {
 
     static byte[] generateDirectMethodHandleHolderClassBytes(String className,
             MethodType[] methodTypes, int[] types) {
+        System.err.println("[JLI_GEN] generateDirectMethodHandleHolderClassBytes class=" + className
+                + " methodTypeCount=" + methodTypes.length);
         ArrayList<LambdaForm> forms = new ArrayList<>();
         ArrayList<String> names = new ArrayList<>();
         for (int i = 0; i < methodTypes.length; i++) {
@@ -104,6 +107,8 @@ class GenerateJLIClassesHelper {
 
     static byte[] generateDelegatingMethodHandleHolderClassBytes(String className,
             MethodType[] methodTypes) {
+        System.err.println("[JLI_GEN] generateDelegatingMethodHandleHolderClassBytes class=" + className
+                + " methodTypeCount=" + methodTypes.length);
 
         HashSet<MethodType> dedupSet = new HashSet<>();
         ArrayList<LambdaForm> forms = new ArrayList<>();
@@ -134,6 +139,9 @@ class GenerateJLIClassesHelper {
 
     static byte[] generateInvokersHolderClassBytes(String className,
             MethodType[] invokerMethodTypes, MethodType[] callSiteMethodTypes) {
+        System.err.println("[JLI_GEN] generateInvokersHolderClassBytes class=" + className
+                + " invokerTypeCount=" + invokerMethodTypes.length
+                + " callSiteTypeCount=" + callSiteMethodTypes.length);
 
         HashSet<MethodType> dedupSet = new HashSet<>();
         ArrayList<LambdaForm> forms = new ArrayList<>();
