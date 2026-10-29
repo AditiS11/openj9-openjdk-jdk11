@@ -617,7 +617,6 @@ AC_DEFUN_ONCE([CUSTOM_LATE_HOOK],
   AC_CONFIG_FILES([$OUTPUTDIR/custom-spec.gmk:$CLOSED_AUTOCONF_DIR/custom-spec.gmk.in])
 
   # explicitly disable classlist generation
-  ENABLE_GENERATE_CLASSLIST=false
 
   AC_MSG_CHECKING([whether to enable link-time optimization])
   AC_ARG_ENABLE([lto], [AS_HELP_STRING([--enable-lto],
