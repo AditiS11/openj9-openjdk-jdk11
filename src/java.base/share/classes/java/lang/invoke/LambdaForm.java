@@ -861,6 +861,9 @@ class LambdaForm {
         if (vmentry != null && isCompiled) {
             return;  // already compiled somehow
         }
+        if (TRACE_LF_PREGENERATION) {
+            CNT_COMPILE_TO_BYTECODE.incrementAndGet();
+        }
 
         // Obtain the invoker MethodType outside of the following try block.
         // This ensures that an IllegalArgumentException is directly thrown if the

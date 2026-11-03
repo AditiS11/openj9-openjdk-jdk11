@@ -1672,6 +1672,9 @@ assertEquals("[three, thee, tee]", asListFix.invoke((Object)argv).toString());
     void customize() {
         final LambdaForm form = this.form;
         if (form.customized == null) {
+            if (TRACE_LF_PREGENERATION) {
+                CNT_CUSTOMIZE.incrementAndGet();
+            }
             LambdaForm newForm = form.customize(this);
             updateForm(newForm);
         } else {
