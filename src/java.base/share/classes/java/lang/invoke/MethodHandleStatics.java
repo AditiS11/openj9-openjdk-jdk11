@@ -29,6 +29,8 @@ import jdk.internal.misc.Unsafe;
 import sun.security.action.GetPropertyAction;
 
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * This class consists exclusively of static names internal to the
@@ -55,6 +57,79 @@ import java.util.Properties;
     static final int CUSTOMIZE_THRESHOLD;
     static final boolean VAR_HANDLE_GUARDS;
     static final int MAX_ARITY;
+
+    /**
+     * Trace every lookupPregenerated() call in
+     * InvokerBytecodeGenerator, logging the LambdaForm kind, basic-type
+     * signature, customization state, and the exact reason for each miss
+     * (GATE1_CUSTOMIZED or GATE2_NOT_IN_HOLDER).  Also records the elapsed
+     * nanoseconds for every generateCustomizedCodeBytes() call so the total
+     * runtime bytecode-generation cost is visible.
+     *
+     */
+    static final boolean TRACE_LF_PREGENERATION;
+
+    /**
+     * Suppress per-MethodHandle LambdaForm customization.
+     * When set, maybeCustomize() becomes a no-op so mh.customize() is never
+     * called, every MethodHandle retains the shared (uncustomized) LambdaForm,
+     * and form.customized remains null throughout the run.
+     *
+     * This keeps lookupPregenerated() Gate 1 from firing, allowing Gate 2
+     * (the Invokers.Holder pre-generated stub lookup) to run for every
+     * compileToBytecode() call.  It also removes the CHECK_CUSTOM Name node
+     * from invokeHandleForm() LambdaForms, eliminating the per-invocation
+     * checkCustomized() overhead entirely.
+     *
+     * Safe under -Xint: the JIT never runs under -Xint, so the JIT-time
+     * benefit of customization (constant-folded field reads, direct dispatch)
+     * is never realized.  Shared LambdaForms execute identically.
+     *
+     */
+    static final boolean SUPPRESS_CUSTOMIZATION;
+
+    /**
+     * Invocation counters. Only allocated and registered when
+     * TRACE_LF_PREGENERATION is true, so there is zero overhead otherwise.
+     * Each counter maps directly to one row in the perf regression table.
+     */
+
+    /** Number of times MethodHandleResolver.resolveInvokeDynamic() was entered. */
+    static final AtomicInteger CNT_RESOLVE_INDY;
+
+    /** Number of times MethodHandleNatives.linkCallSite() was entered. */
+    static final AtomicInteger CNT_LINK_CALL_SITE;
+
+    /** Number of times LambdaForm.compileToBytecode() did real work
+     *  (i.e. was not skipped by the forceInterpretation or already-compiled guards). */
+    static final AtomicInteger CNT_COMPILE_TO_BYTECODE;
+
+    /** Number of times lookupPregenerated() returned a non-null result (cache hit). */
+    static final AtomicInteger CNT_PREGEN_HIT;
+
+    /** Number of times lookupPregenerated() returned null due to Gate 1
+     *  (form.customized != null). */
+    static final AtomicInteger CNT_PREGEN_MISS_GATE1;
+
+    /** Number of times lookupPregenerated() returned null due to Gate 2
+     *  (signature not present in the Holder class). */
+    static final AtomicInteger CNT_PREGEN_MISS_GATE2;
+
+    /** Number of times generateCustomizedCodeBytes() was actually invoked
+     *  (i.e. IBG ran ASM to produce a new class file). */
+    static final AtomicInteger CNT_IBG_CALLS;
+
+    /** Total nanoseconds spent inside generateCustomizedCodeBytes() calls. */
+    static final AtomicLong    CNT_IBG_TOTAL_NS;
+
+    /* Number of times MethodHandleImpl.makeGuardWithTest() was called. */
+    static final AtomicInteger CNT_GWT;
+
+    /* Number of times Invokers.checkCustomized() ran */
+    static final AtomicInteger CNT_CHECK_CUSTOMIZED;
+
+    /* Number of times MethodHandle.customize() actually built a customized LambdaForm. */
+    static final AtomicInteger CNT_CUSTOMIZE;
 
     static {
         Properties props = GetPropertyAction.privilegedGetProperties();
@@ -89,6 +164,67 @@ import java.util.Properties;
 
         if (CUSTOMIZE_THRESHOLD < -1 || CUSTOMIZE_THRESHOLD > 127) {
             throw newInternalError("CUSTOMIZE_THRESHOLD should be in [-1...127] range");
+        }
+
+        TRACE_LF_PREGENERATION = Boolean.parseBoolean(
+                props.getProperty("java.lang.invoke.MethodHandle.TRACE_LF_PREGENERATION", "false"));
+        SUPPRESS_CUSTOMIZATION = Boolean.parseBoolean(
+                props.getProperty("java.lang.invoke.MethodHandle.SUPPRESS_CUSTOMIZATION", "false"));
+
+        if (TRACE_LF_PREGENERATION) {
+            CNT_RESOLVE_INDY         = new AtomicInteger();
+            CNT_LINK_CALL_SITE       = new AtomicInteger();
+            CNT_COMPILE_TO_BYTECODE  = new AtomicInteger();
+            CNT_PREGEN_HIT           = new AtomicInteger();
+            CNT_PREGEN_MISS_GATE1    = new AtomicInteger();
+            CNT_PREGEN_MISS_GATE2    = new AtomicInteger();
+            CNT_IBG_CALLS            = new AtomicInteger();
+            CNT_IBG_TOTAL_NS         = new AtomicLong();
+            CNT_GWT                  = new AtomicInteger();
+            CNT_CHECK_CUSTOMIZED     = new AtomicInteger();
+            CNT_CUSTOMIZE            = new AtomicInteger();
+
+            // Print the summary table once, when the JVM exits.
+            // Use a named Thread subclass instead of a lambda: a lambda here compiles to
+            // invokedynamic, which re-enters the method handle machinery from this class
+            // initializer and fails during VM boot.
+            Runtime.getRuntime().addShutdownHook(new PregenStatsHook());
+        } else {
+            CNT_RESOLVE_INDY         = null;
+            CNT_LINK_CALL_SITE       = null;
+            CNT_COMPILE_TO_BYTECODE  = null;
+            CNT_PREGEN_HIT           = null;
+            CNT_PREGEN_MISS_GATE1    = null;
+            CNT_PREGEN_MISS_GATE2    = null;
+            CNT_IBG_CALLS            = null;
+            CNT_IBG_TOTAL_NS         = null;
+            CNT_GWT                  = null;
+            CNT_CHECK_CUSTOMIZED     = null;
+            CNT_CUSTOMIZE            = null;
+        }
+    }
+
+    /** Prints the TRACE_LF_PREGENERATION counter summary at JVM exit. */
+    private static final class PregenStatsHook extends Thread {
+        PregenStatsHook() {
+            super("LF-pregen-stats");
+        }
+
+        @Override
+        public void run() {
+            System.err.println("[LF_PREGEN] ========== MH resolution counter summary ==========");
+            System.err.println("[LF_PREGEN] resolveInvokeDynamic calls  : " + CNT_RESOLVE_INDY.get());
+            System.err.println("[LF_PREGEN] linkCallSite calls           : " + CNT_LINK_CALL_SITE.get());
+            System.err.println("[LF_PREGEN] compileToBytecode calls      : " + CNT_COMPILE_TO_BYTECODE.get());
+            System.err.println("[LF_PREGEN] lookupPregenerated hits      : " + CNT_PREGEN_HIT.get());
+            System.err.println("[LF_PREGEN] lookupPregenerated Gate1miss : " + CNT_PREGEN_MISS_GATE1.get());
+            System.err.println("[LF_PREGEN] lookupPregenerated Gate2miss : " + CNT_PREGEN_MISS_GATE2.get());
+            System.err.println("[LF_PREGEN] IBG generateCodeBytes calls  : " + CNT_IBG_CALLS.get());
+            System.err.println("[LF_PREGEN] IBG generateCodeBytes total  : " + CNT_IBG_TOTAL_NS.get() + " ns");
+            System.err.println("[LF_PREGEN] makeGuardWithTest calls      : " + CNT_GWT.get());
+            System.err.println("[LF_PREGEN] checkCustomized calls        : " + CNT_CHECK_CUSTOMIZED.get());
+            System.err.println("[LF_PREGEN] customize() builds           : " + CNT_CUSTOMIZE.get());
+            System.err.println("[LF_PREGEN] ====================================================");
         }
     }
 

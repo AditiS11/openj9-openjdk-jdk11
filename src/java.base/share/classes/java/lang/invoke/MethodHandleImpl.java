@@ -774,6 +774,9 @@ import static jdk.internal.org.objectweb.asm.Opcodes.*;
     MethodHandle makeGuardWithTest(MethodHandle test,
                                    MethodHandle target,
                                    MethodHandle fallback) {
+        if (TRACE_LF_PREGENERATION) {
+            CNT_GWT.incrementAndGet();
+        }
         MethodType type = target.type();
         assert(test.type().equals(type.changeReturnType(boolean.class)) && fallback.type().equals(type));
         MethodType basicType = type.basicType();
