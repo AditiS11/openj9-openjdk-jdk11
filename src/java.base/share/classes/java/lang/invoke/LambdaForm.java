@@ -870,8 +870,12 @@ class LambdaForm {
         // type would have 256 or more parameters
         MethodType invokerType = methodType();
         assert(vmentry == null || vmentry.getMethodType().basicType().equals(invokerType));
+        long cgT0 = TRACE_LF_PREGENERATION ? System.nanoTime() : 0;
         try {
             vmentry = InvokerBytecodeGenerator.generateCustomizedCode(this, invokerType);
+            if (TRACE_LF_PREGENERATION) {
+                NS_COMPILE_TO_BYTECODE.addAndGet(System.nanoTime() - cgT0);
+            }
             if (TRACE_INTERPRETER)
                 traceInterpreter("compileToBytecode", this);
             isCompiled = true;

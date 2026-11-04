@@ -41,6 +41,11 @@ import static java.lang.invoke.MethodHandleNatives.Constants.*;
 import static java.lang.invoke.MethodHandleStatics.TRACE_METHOD_LINKAGE;
 import static java.lang.invoke.MethodHandleStatics.TRACE_LF_PREGENERATION;
 import static java.lang.invoke.MethodHandleStatics.CNT_LINK_CALL_SITE;
+import static java.lang.invoke.MethodHandleStatics.CNT_LINK_METHOD;
+import static java.lang.invoke.MethodHandleStatics.NS_BOOTSTRAP;
+import static java.lang.invoke.MethodHandleStatics.NS_LINKER_LOOKUP;
+import static java.lang.invoke.MethodHandleStatics.NS_LINK_CALL_SITE;
+import static java.lang.invoke.MethodHandleStatics.NS_LINK_METHOD;
 import static java.lang.invoke.MethodHandles.Lookup.IMPL_LOOKUP;
 
 /**
@@ -248,36 +253,55 @@ class MethodHandleNatives {
                                    Object nameObj, Object typeObj,
                                    Object staticArguments,
                                    Object[] appendixResult) {
+        long t0 = 0;
         if (TRACE_LF_PREGENERATION) {
             CNT_LINK_CALL_SITE.incrementAndGet();
+            t0 = System.nanoTime();
         }
-        MethodHandle bootstrapMethod = (MethodHandle)bootstrapMethodObj;
-        Class<?> caller = (Class<?>)callerObj;
-        String name = nameObj.toString().intern();
-        MethodType type = (MethodType)typeObj;
-        if (!TRACE_METHOD_LINKAGE)
-            return linkCallSiteImpl(caller, bootstrapMethod, name, type,
-                                    staticArguments, appendixResult);
-        return linkCallSiteTracing(caller, bootstrapMethod, name, type,
-                                   staticArguments, appendixResult);
+        try {
+            MethodHandle bootstrapMethod = (MethodHandle)bootstrapMethodObj;
+            Class<?> caller = (Class<?>)callerObj;
+            String name = nameObj.toString().intern();
+            MethodType type = (MethodType)typeObj;
+            if (!TRACE_METHOD_LINKAGE)
+                return linkCallSiteImpl(caller, bootstrapMethod, name, type,
+                                        staticArguments, appendixResult);
+            return linkCallSiteTracing(caller, bootstrapMethod, name, type,
+                                       staticArguments, appendixResult);
+        } finally {
+            if (TRACE_LF_PREGENERATION) {
+                NS_LINK_CALL_SITE.addAndGet(System.nanoTime() - t0);
+            }
+        }
     }
     static MemberName linkCallSiteImpl(Class<?> caller,
                                        MethodHandle bootstrapMethod,
                                        String name, MethodType type,
                                        Object staticArguments,
                                        Object[] appendixResult) {
+        long t0 = TRACE_LF_PREGENERATION ? System.nanoTime() : 0;
         CallSite callSite = CallSite.makeSite(bootstrapMethod,
                                               name,
                                               type,
                                               staticArguments,
                                               caller);
+        long t1 = 0;
+        if (TRACE_LF_PREGENERATION) {
+            t1 = System.nanoTime();
+            NS_BOOTSTRAP.addAndGet(t1 - t0);
+        }
+        MemberName linker;
         if (callSite instanceof ConstantCallSite) {
             appendixResult[0] = callSite.dynamicInvoker();
-            return Invokers.linkToTargetMethod(type);
+            linker = Invokers.linkToTargetMethod(type);
         } else {
             appendixResult[0] = callSite;
-            return Invokers.linkToCallSiteMethod(type);
+            linker = Invokers.linkToCallSiteMethod(type);
         }
+        if (TRACE_LF_PREGENERATION) {
+            NS_LINKER_LOOKUP.addAndGet(System.nanoTime() - t1);
+        }
+        return linker;
     }
     // Tracing logic:
     static MemberName linkCallSiteTracing(Class<?> caller,
@@ -457,9 +481,20 @@ class MethodHandleNatives {
     static MemberName linkMethod(Class<?> callerClass, int refKind,
                                  Class<?> defc, String name, Object type,
                                  Object[] appendixResult) {
-        if (!TRACE_METHOD_LINKAGE)
-            return linkMethodImpl(callerClass, refKind, defc, name, type, appendixResult);
-        return linkMethodTracing(callerClass, refKind, defc, name, type, appendixResult);
+        long t0 = 0;
+        if (TRACE_LF_PREGENERATION) {
+            CNT_LINK_METHOD.incrementAndGet();
+            t0 = System.nanoTime();
+        }
+        try {
+            if (!TRACE_METHOD_LINKAGE)
+                return linkMethodImpl(callerClass, refKind, defc, name, type, appendixResult);
+            return linkMethodTracing(callerClass, refKind, defc, name, type, appendixResult);
+        } finally {
+            if (TRACE_LF_PREGENERATION) {
+                NS_LINK_METHOD.addAndGet(System.nanoTime() - t0);
+            }
+        }
     }
     static MemberName linkMethodImpl(Class<?> callerClass, int refKind,
                                      Class<?> defc, String name, Object type,
