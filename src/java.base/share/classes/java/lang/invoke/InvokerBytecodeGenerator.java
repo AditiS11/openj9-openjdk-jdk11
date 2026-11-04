@@ -695,7 +695,11 @@ class InvokerBytecodeGenerator {
      * Generate customized bytecode for a given LambdaForm.
      */
     static MemberName generateCustomizedCode(LambdaForm form, MethodType invokerType) {
+        long lpT0 = TRACE_LF_PREGENERATION ? System.nanoTime() : 0;
         MemberName pregenerated = lookupPregenerated(form, invokerType);
+        if (TRACE_LF_PREGENERATION) {
+            NS_PREGEN_LOOKUP.addAndGet(System.nanoTime() - lpT0);
+        }
         if (pregenerated != null) {
             if (TRACE_LF_PREGENERATION) {
                 CNT_PREGEN_HIT.incrementAndGet();
@@ -708,7 +712,8 @@ class InvokerBytecodeGenerator {
         // jlink time).  Log the miss and time the bytecode generation so we
         // know (a) which signatures need to be added to a Liberty-specific JLI
         // trace and (b) how much wall-clock time bytecode generation costs.
-        if (TRACE_LF_PREGENERATION) {
+        // Only count a Gate 2 miss if Gate 1 did not already fire for this form.
+        if (TRACE_LF_PREGENERATION && form.customized == null) {
             CNT_PREGEN_MISS_GATE2.incrementAndGet();
             System.err.println("[LF_PREGEN] MISS kind=" + form.kind
                     + " sig=" + invokerType.basicType()

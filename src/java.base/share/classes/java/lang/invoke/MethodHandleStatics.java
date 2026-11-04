@@ -89,6 +89,14 @@ import java.util.concurrent.atomic.AtomicLong;
     static final boolean SUPPRESS_CUSTOMIZATION;
 
     /**
+     * Fetch the ConstantPool object once per invokedynamic site in
+     * MethodHandleResolver.resolveInvokeDynamic() instead of once per static
+     * bootstrap argument. Worth enabling only if the "Indy prep" timer is a
+     * noticeable share of startup.
+     */
+    static final boolean HOIST_BSM_CP;
+
+    /**
      * Invocation counters. Only allocated and registered when
      * TRACE_LF_PREGENERATION is true, so there is zero overhead otherwise.
      * Each counter maps directly to one row in the perf regression table.
@@ -131,6 +139,20 @@ import java.util.concurrent.atomic.AtomicLong;
     /* Number of times MethodHandle.customize() actually built a customized LambdaForm. */
     static final AtomicInteger CNT_CUSTOMIZE;
 
+    /* Phase timers (ns). Nested: LINK_CALL_SITE contains BOOTSTRAP and LINKER_LOOKUP;
+     * LINKER_LOOKUP contains CSFORM_MISS; CSFORM_MISS contains COMPILE_TO_BYTECODE;
+     * COMPILE_TO_BYTECODE contains PREGEN_LOOKUP and IBG. */
+    static final AtomicLong    NS_INDY_PREP;           // resolveInvokeDynamic entry -> before linkCallSite
+    static final AtomicLong    NS_LINK_CALL_SITE;      // whole linkCallSite
+    static final AtomicLong    NS_BOOTSTRAP;           // CallSite.makeSite (bootstrap method)
+    static final AtomicLong    NS_LINKER_LOOKUP;       // Invokers.linkToTarget/CallSiteMethod
+    static final AtomicInteger CNT_CSFORM_MISS;        // callSiteForm cache misses
+    static final AtomicLong    NS_CSFORM_MISS;         // callSiteForm miss path
+    static final AtomicLong    NS_COMPILE_TO_BYTECODE; // generateCustomizedCode call in compileToBytecode
+    static final AtomicLong    NS_PREGEN_LOOKUP;       // lookupPregenerated
+    static final AtomicInteger CNT_LINK_METHOD;        // linkMethod calls (invokehandle path)
+    static final AtomicLong    NS_LINK_METHOD;         // whole linkMethod
+
     static {
         Properties props = GetPropertyAction.privilegedGetProperties();
         DEBUG_METHOD_HANDLE_NAMES = Boolean.parseBoolean(
@@ -170,6 +192,8 @@ import java.util.concurrent.atomic.AtomicLong;
                 props.getProperty("java.lang.invoke.MethodHandle.TRACE_LF_PREGENERATION", "false"));
         SUPPRESS_CUSTOMIZATION = Boolean.parseBoolean(
                 props.getProperty("java.lang.invoke.MethodHandle.SUPPRESS_CUSTOMIZATION", "false"));
+        HOIST_BSM_CP = Boolean.parseBoolean(
+                props.getProperty("java.lang.invoke.MethodHandle.HOIST_BSM_CP", "false"));
 
         if (TRACE_LF_PREGENERATION) {
             CNT_RESOLVE_INDY         = new AtomicInteger();
@@ -183,6 +207,16 @@ import java.util.concurrent.atomic.AtomicLong;
             CNT_GWT                  = new AtomicInteger();
             CNT_CHECK_CUSTOMIZED     = new AtomicInteger();
             CNT_CUSTOMIZE            = new AtomicInteger();
+            NS_INDY_PREP             = new AtomicLong();
+            NS_LINK_CALL_SITE        = new AtomicLong();
+            NS_BOOTSTRAP             = new AtomicLong();
+            NS_LINKER_LOOKUP         = new AtomicLong();
+            CNT_CSFORM_MISS          = new AtomicInteger();
+            NS_CSFORM_MISS           = new AtomicLong();
+            NS_COMPILE_TO_BYTECODE   = new AtomicLong();
+            NS_PREGEN_LOOKUP         = new AtomicLong();
+            CNT_LINK_METHOD          = new AtomicInteger();
+            NS_LINK_METHOD           = new AtomicLong();
 
             // Print the summary table once, when the JVM exits.
             // Use a named Thread subclass instead of a lambda: a lambda here compiles to
@@ -201,6 +235,16 @@ import java.util.concurrent.atomic.AtomicLong;
             CNT_GWT                  = null;
             CNT_CHECK_CUSTOMIZED     = null;
             CNT_CUSTOMIZE            = null;
+            NS_INDY_PREP             = null;
+            NS_LINK_CALL_SITE        = null;
+            NS_BOOTSTRAP             = null;
+            NS_LINKER_LOOKUP         = null;
+            CNT_CSFORM_MISS          = null;
+            NS_CSFORM_MISS           = null;
+            NS_COMPILE_TO_BYTECODE   = null;
+            NS_PREGEN_LOOKUP         = null;
+            CNT_LINK_METHOD          = null;
+            NS_LINK_METHOD           = null;
         }
     }
 
@@ -224,6 +268,17 @@ import java.util.concurrent.atomic.AtomicLong;
             System.err.println("[LF_PREGEN] makeGuardWithTest calls      : " + CNT_GWT.get());
             System.err.println("[LF_PREGEN] checkCustomized calls        : " + CNT_CHECK_CUSTOMIZED.get());
             System.err.println("[LF_PREGEN] customize() builds           : " + CNT_CUSTOMIZE.get());
+            System.err.println("[LF_PREGEN] --- Phase timers ---");
+            System.err.println("[LF_PREGEN] Indy prep (type,bsm,args)    : " + NS_INDY_PREP.get());
+            System.err.println("[LF_PREGEN] LinkCallSite total           : " + NS_LINK_CALL_SITE.get());
+            System.err.println("[LF_PREGEN]   Bootstrap (makeSite)       : " + NS_BOOTSTRAP.get());
+            System.err.println("[LF_PREGEN]   Linker lookup              : " + NS_LINKER_LOOKUP.get());
+            System.err.println("[LF_PREGEN]     CallSiteForm misses      : " + CNT_CSFORM_MISS.get());
+            System.err.println("[LF_PREGEN]     CallSiteForm miss time   : " + NS_CSFORM_MISS.get());
+            System.err.println("[LF_PREGEN] Compile gen total            : " + NS_COMPILE_TO_BYTECODE.get());
+            System.err.println("[LF_PREGEN]   LookupPregenerated         : " + NS_PREGEN_LOOKUP.get());
+            System.err.println("[LF_PREGEN] LinkMethod calls             : " + CNT_LINK_METHOD.get());
+            System.err.println("[LF_PREGEN] LinkMethod total             : " + NS_LINK_METHOD.get());
             System.err.println("[LF_PREGEN] ====================================================");
         }
     }

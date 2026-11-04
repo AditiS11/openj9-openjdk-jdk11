@@ -531,6 +531,11 @@ class Invokers {
         final int which = (skipCallSite ? MethodTypeForm.LF_MH_LINKER : MethodTypeForm.LF_CS_LINKER);
         LambdaForm lform = mtype.form().cachedLambdaForm(which);
         if (lform != null)  return lform;
+        long csT0 = 0;
+        if (TRACE_LF_PREGENERATION) {
+            CNT_CSFORM_MISS.incrementAndGet();
+            csT0 = System.nanoTime();
+        }
         // exactInvokerForm (Object,Object)Object
         //   link with java.lang.invoke.MethodHandle.invokeBasic(MethodHandle,Object,Object)Object/invokeSpecial
         final int ARG_BASE     = 0;
@@ -558,6 +563,9 @@ class Invokers {
                 (skipCallSite ? LINK_TO_TARGET_METHOD : LINK_TO_CALL_SITE));
         lform.compileToBytecode();  // JVM needs a real methodOop
         lform = mtype.form().setCachedLambdaForm(which, lform);
+        if (TRACE_LF_PREGENERATION) {
+            NS_CSFORM_MISS.addAndGet(System.nanoTime() - csT0);
+        }
         return lform;
     }
 
