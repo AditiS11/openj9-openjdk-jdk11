@@ -87,6 +87,11 @@ public final class GenerateJLIClassesPlugin implements Plugin {
 
     String mainArgument;
 
+    // Debug counters, reported once from transform() so that the build log shows
+    // whether the pre-generation trace was actually read and used.
+    private int traceLfResolveLines;
+    private int traceSpeciesLines;
+
     public GenerateJLIClassesPlugin() {
     }
 
@@ -218,7 +223,11 @@ public final class GenerateJLIClassesPlugin implements Plugin {
         } else {
             File file = new File(mainArgument.substring(1));
             if (file.exists()) {
+                System.out.println("[JLI_PREGEN] reading trace file " + file.getAbsolutePath());
                 readTraceConfig(fileLines(file));
+            } else {
+                System.out.println("[JLI_PREGEN] WARNING: trace file NOT FOUND, only default shapes will be generated: "
+                        + file.getAbsolutePath());
             }
         }
     }
@@ -240,6 +249,7 @@ public final class GenerateJLIClassesPlugin implements Plugin {
              .forEach(parts -> {
                 switch (parts[0]) {
                     case "[SPECIES_RESOLVE]":
+                        traceSpeciesLines++;
                         // Allow for new types of species data classes being resolved here
                         if (parts.length == 3 && parts[1].startsWith("java.lang.invoke.BoundMethodHandle$Species_")) {
                             String species = parts[1].substring("java.lang.invoke.BoundMethodHandle$Species_".length());
@@ -249,6 +259,7 @@ public final class GenerateJLIClassesPlugin implements Plugin {
                         }
                         break;
                     case "[LF_RESOLVE]":
+                        traceLfResolveLines++;
                         String methodType = parts[3];
                         validateMethodType(methodType);
                         if (parts[1].equals(INVOKERS_HOLDER_NAME)) {
@@ -337,6 +348,19 @@ public final class GenerateJLIClassesPlugin implements Plugin {
 
         // Generate LambdaForm Holder classes
         generateHolderClasses(out);
+
+        int dmhCount = 0;
+        for (Set<String> s : dmhMethods.values()) {
+            dmhCount += s.size();
+        }
+        System.out.println("[JLI_PREGEN] ========== pre-generation summary ==========");
+        System.out.println("[JLI_PREGEN] trace [LF_RESOLVE] lines read      : " + traceLfResolveLines);
+        System.out.println("[JLI_PREGEN] trace [SPECIES_RESOLVE] lines read : " + traceSpeciesLines);
+        System.out.println("[JLI_PREGEN] BoundMethodHandle species generated: " + speciesTypes.size());
+        System.out.println("[JLI_PREGEN] DirectMethodHandle$Holder methods   : " + dmhCount);
+        System.out.println("[JLI_PREGEN] Invokers$Holder invoker methods     : " + invokerTypes.size());
+        System.out.println("[JLI_PREGEN] Invokers$Holder call-site methods   : " + callSiteTypes.size());
+        System.out.println("[JLI_PREGEN] =============================================");
 
         // Let it go
         speciesTypes = null;

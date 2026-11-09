@@ -350,7 +350,11 @@ class Invokers {
 
     private static LambdaForm varHandleMethodGenericLinkerHandleForm(VarHandle.AccessMode ak,
             MethodType mtype) {
-        // TODO Cache form?
+        // The form only depends on the basic type of mtype (the access mode is
+        // used for the debug name only), so cache it per basic MethodType.
+        MethodTypeForm basicTypeForm = mtype.basicType().form();
+        LambdaForm cached = basicTypeForm.cachedLambdaForm(MethodTypeForm.LF_VH_GEN_LINKER);
+        if (cached != null)  return cached;
 
         final int THIS_VH      = 0;
         final int ARG_BASE     = THIS_VH + 1;
@@ -390,7 +394,7 @@ class Invokers {
             LambdaForm.associateWithDebugName(lform, name);
         }
         lform.compileToBytecode();
-        return lform;
+        return basicTypeForm.setCachedLambdaForm(MethodTypeForm.LF_VH_GEN_LINKER, lform);
     }
 
     private static LambdaForm varHandleMethodInvokerHandleForm(VarHandle.AccessMode ak,
