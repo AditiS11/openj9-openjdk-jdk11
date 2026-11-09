@@ -65,6 +65,23 @@ ifeq ($(ENABLE_GENERATE_CLASSLIST), true)
   JLINK_ORDER_RESOURCES += @$(SUPPORT_OUTPUTDIR)/link_opt/classlist
   JLINK_JLI_CLASSES := --generate-jli-classes=@$(SUPPORT_OUTPUTDIR)/link_opt/default_jli_trace.txt
 endif
+# With the OpenJDK method handles, pregenerate the LambdaForm Holder classes
+# and the BoundMethodHandle species from a trace recorded on a real workload.
+# This does not depend on ENABLE_GENERATE_CLASSLIST. The trace file can be
+# replaced from the make command line: make images JLI_TRACE_FILE_OPENJ9=<path>
+ifeq ($(OPENJ9_ENABLE_OPENJDK_METHODHANDLES), true)
+  JLI_TRACE_FILE_OPENJ9 ?= $(TOPDIR)/make/data/jli/liberty_jli_trace.txt
+  JLINK_JLI_CLASSES := --generate-jli-classes=@$(JLI_TRACE_FILE_OPENJ9)
+  # Shown in the build output so it is clear whether pre-generation is on.
+  $(info [JLI_PREGEN] OPENJ9_ENABLE_OPENJDK_METHODHANDLES=true, jlink option: $(JLINK_JLI_CLASSES))
+  ifeq ($(wildcard $(JLI_TRACE_FILE_OPENJ9)), )
+    $(warning [JLI_PREGEN] trace file does not exist: $(JLI_TRACE_FILE_OPENJ9))
+  else
+    $(info [JLI_PREGEN] trace file found: $(JLI_TRACE_FILE_OPENJ9))
+  endif
+else
+  $(info [JLI_PREGEN] OPENJ9_ENABLE_OPENJDK_METHODHANDLES is not true, jlink option: $(JLINK_JLI_CLASSES))
+endif
 JLINK_ORDER_RESOURCES += \
     /java.base/java/** \
     /java.base/jdk/** \

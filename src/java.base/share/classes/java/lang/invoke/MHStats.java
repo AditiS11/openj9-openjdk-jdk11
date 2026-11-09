@@ -15,7 +15,8 @@ import java.util.Map;
 /*non-public*/ final class MHStats {
     private MHStats() { }
 
-    private static final int MAX_KINDS = 64;
+    // One slot per LambdaForm.Kind constant (the enum has more than 64 values).
+    private static final int MAX_KINDS = LambdaForm.Kind.values().length;
 
     // ---- per LambdaForm.Kind counters (index = Kind.ordinal()) ----
     private static final long[] compiles   = new long[MAX_KINDS]; // generateCustomizedCode calls
