@@ -826,6 +826,7 @@ class LambdaForm {
      */
     public void prepare() {
         if (COMPILE_THRESHOLD == 0 && !forceInterpretation() && !isCompiled) {
+            if (TRACE_MH_STATS) MHStats.compileFromPrepare();
             compileToBytecode();
         }
         if (this.vmentry != null) {
@@ -867,8 +868,10 @@ class LambdaForm {
         // type would have 256 or more parameters
         MethodType invokerType = methodType();
         assert(vmentry == null || vmentry.getMethodType().basicType().equals(invokerType));
+        long statsStart = TRACE_MH_STATS ? System.nanoTime() : 0L;
         try {
             vmentry = InvokerBytecodeGenerator.generateCustomizedCode(this, invokerType);
+            if (TRACE_MH_STATS) MHStats.compileWall(System.nanoTime() - statsStart);
             if (TRACE_INTERPRETER)
                 traceInterpreter("compileToBytecode", this);
             isCompiled = true;
@@ -951,6 +954,7 @@ class LambdaForm {
     Object interpretWithArguments(Object... argumentValues) throws Throwable {
         if (TRACE_INTERPRETER)
             return interpretWithArgumentsTracing(argumentValues);
+        if (TRACE_MH_STATS) MHStats.interpretCall();
         checkInvocationCounter();
         assert(arityCheck(argumentValues));
         Object[] values = Arrays.copyOf(argumentValues, names.length);
@@ -987,6 +991,7 @@ class LambdaForm {
             invocationCounter++;  // benign race
             if (invocationCounter >= COMPILE_THRESHOLD) {
                 // Replace vmentry with a bytecode version of this LF.
+                if (TRACE_MH_STATS) MHStats.compileFromThreshold();
                 compileToBytecode();
             }
         }
