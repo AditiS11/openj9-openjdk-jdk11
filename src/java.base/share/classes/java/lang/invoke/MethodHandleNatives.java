@@ -261,6 +261,10 @@ class MethodHandleNatives {
                                        String name, MethodType type,
                                        Object staticArguments,
                                        Object[] appendixResult) {
+        if (MethodHandleStatics.TRACE_MH_STATS) {
+            return linkCallSiteImplStats(caller, bootstrapMethod, name, type,
+                                         staticArguments, appendixResult);
+        }
         CallSite callSite = CallSite.makeSite(bootstrapMethod,
                                               name,
                                               type,
@@ -273,6 +277,34 @@ class MethodHandleNatives {
             appendixResult[0] = callSite;
             return Invokers.linkToCallSiteMethod(type);
         }
+    }
+    // Same work as linkCallSiteImpl(), timed per step. Used only when TRACE_MH_STATS is set.
+    private static MemberName linkCallSiteImplStats(Class<?> caller,
+                                                    MethodHandle bootstrapMethod,
+                                                    String name, MethodType type,
+                                                    Object staticArguments,
+                                                    Object[] appendixResult) {
+        long t0 = System.nanoTime();
+        CallSite callSite = CallSite.makeSite(bootstrapMethod,
+                                              name,
+                                              type,
+                                              staticArguments,
+                                              caller);
+        long t1 = System.nanoTime();
+        MemberName result;
+        long t2;
+        if (callSite instanceof ConstantCallSite) {
+            appendixResult[0] = callSite.dynamicInvoker();
+            t2 = System.nanoTime();
+            result = Invokers.linkToTargetMethod(type);
+        } else {
+            appendixResult[0] = callSite;
+            t2 = System.nanoTime();
+            result = Invokers.linkToCallSiteMethod(type);
+        }
+        long t3 = System.nanoTime();
+        MHStats.linkCallSiteParts(t1 - t0, t2 - t1, t3 - t2);
+        return result;
     }
     // Tracing logic:
     static MemberName linkCallSiteTracing(Class<?> caller,
@@ -452,6 +484,15 @@ class MethodHandleNatives {
     static MemberName linkMethod(Class<?> callerClass, int refKind,
                                  Class<?> defc, String name, Object type,
                                  Object[] appendixResult) {
+        if (MethodHandleStatics.TRACE_MH_STATS) {
+            long t0 = System.nanoTime();
+            try {
+                return linkMethodImpl(callerClass, refKind, defc, name, type, appendixResult);
+            } finally {
+                MHStats.linkMethod(defc.getSimpleName() + "." + name + " " + type,
+                                   System.nanoTime() - t0);
+            }
+        }
         if (!TRACE_METHOD_LINKAGE)
             return linkMethodImpl(callerClass, refKind, defc, name, type, appendixResult);
         return linkMethodTracing(callerClass, refKind, defc, name, type, appendixResult);

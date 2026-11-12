@@ -192,6 +192,19 @@ import static jdk.internal.org.objectweb.asm.Opcodes.*;
      */
     @Override
     CallSite buildCallSite() throws LambdaConversionException {
+        if (!MethodHandleStatics.TRACE_MH_STATS) {
+            return buildCallSiteImpl();
+        }
+        long t0 = System.nanoTime();
+        try {
+            return buildCallSiteImpl();
+        } finally {
+            MHStats.lambdaBuild(System.nanoTime() - t0,
+                                invokedType.parameterCount() == 0 && !disableEagerInitialization);
+        }
+    }
+
+    private CallSite buildCallSiteImpl() throws LambdaConversionException {
         final Class<?> innerClass = spinInnerClass();
         if (invokedType.parameterCount() == 0 && !disableEagerInitialization) {
             // In the case of a non-capturing lambda, we optimize linkage by pre-computing a single instance,
@@ -252,6 +265,18 @@ import static jdk.internal.org.objectweb.asm.Opcodes.*;
      * is not found
      */
     private Class<?> spinInnerClass() throws LambdaConversionException {
+        if (!MethodHandleStatics.TRACE_MH_STATS) {
+            return spinInnerClassImpl();
+        }
+        long t0 = System.nanoTime();
+        try {
+            return spinInnerClassImpl();
+        } finally {
+            MHStats.lambdaSpin(System.nanoTime() - t0);
+        }
+    }
+
+    private Class<?> spinInnerClassImpl() throws LambdaConversionException {
         String[] interfaces;
         String samIntf = samBase.getName().replace('.', '/');
         boolean accidentallySerializable = !isSerializable && Serializable.class.isAssignableFrom(samBase);
@@ -328,7 +353,13 @@ import static jdk.internal.org.objectweb.asm.Opcodes.*;
             new PropertyPermission("user.dir", "read"));
         }
 
-        return UNSAFE.defineAnonymousClass(targetClass, classBytes, null);
+        if (!MethodHandleStatics.TRACE_MH_STATS) {
+            return UNSAFE.defineAnonymousClass(targetClass, classBytes, null);
+        }
+        long t0 = System.nanoTime();
+        Class<?> c = UNSAFE.defineAnonymousClass(targetClass, classBytes, null);
+        MHStats.lambdaDefine(System.nanoTime() - t0, classBytes.length);
+        return c;
     }
 
     /**

@@ -48,6 +48,9 @@ import java.util.Properties;
     static final boolean TRACE_METHOD_LINKAGE;
     static final boolean TRACE_RESOLVE;
     static final boolean TRACE_MH_STATS;
+    // MemberName counters. Plain fields on purpose: MemberName is hot and a lost update
+    // only makes a count slightly low. Written only when TRACE_MH_STATS is set.
+    static long MN_CREATED, MN_CLONED, MN_RESOLVES, MN_RESOLVE_NS;
     static final int COMPILE_THRESHOLD;
     static final boolean LOG_LF_COMPILATION_FAILURE;
     static final int DONT_INLINE_THRESHOLD;

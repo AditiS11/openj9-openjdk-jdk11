@@ -539,6 +539,7 @@ import static java.lang.invoke.MethodHandleStatics.newInternalError;
 
     /** Initialize a query.   It is not resolved. */
     private void init(Class<?> defClass, String name, Object type, int flags) {
+        if (MethodHandleStatics.TRACE_MH_STATS) MethodHandleStatics.MN_CREATED++;
         // defining class is allowed to be null (for a naked name/type pair)
         //name.toString();  // null check
         //type.equals(type);  // null check
@@ -744,10 +745,13 @@ import static java.lang.invoke.MethodHandleStatics.newInternalError;
     }
 
     // bare-bones constructor; the JVM will fill it in
-    MemberName() { }
+    MemberName() {
+        if (MethodHandleStatics.TRACE_MH_STATS) MethodHandleStatics.MN_CREATED++;
+    }
 
     // locally useful cloner
     @Override protected MemberName clone() {
+        if (MethodHandleStatics.TRACE_MH_STATS) MethodHandleStatics.MN_CLONED++;
         try {
             return (MemberName) super.clone();
         } catch (CloneNotSupportedException ex) {
@@ -1073,7 +1077,14 @@ import static java.lang.invoke.MethodHandleStatics.newInternalError;
                 //
                 // REFC view on PTYPES doesn't matter, since it is used only as a starting point for resolution and doesn't
                 // participate in method selection.
-                m = MethodHandleNatives.resolve(m, lookupClass, speculativeResolve);
+                if (MethodHandleStatics.TRACE_MH_STATS) {
+                    long t0 = System.nanoTime();
+                    m = MethodHandleNatives.resolve(m, lookupClass, speculativeResolve);
+                    MethodHandleStatics.MN_RESOLVES++;
+                    MethodHandleStatics.MN_RESOLVE_NS += System.nanoTime() - t0;
+                } else {
+                    m = MethodHandleNatives.resolve(m, lookupClass, speculativeResolve);
+                }
                 if (m == null && speculativeResolve) {
                     return null;
                 }
@@ -1184,13 +1195,6 @@ import static java.lang.invoke.MethodHandleStatics.newInternalError;
             for (int i = 0; i < length; i++)
                 buf[i] = new MemberName();
             return buf;
-        }
-    }
-
-    @Override
-    protected void finalize() {
-        if (null != clazz) {
-            MethodHandleNatives.markClassForMemberNamePruning(clazz);
         }
     }
 }

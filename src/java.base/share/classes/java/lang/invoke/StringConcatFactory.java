@@ -653,6 +653,7 @@ public final class StringConcatFactory {
         MethodType mt = adaptType(concatType);
         Recipe rec = new Recipe(recipe, constants);
 
+        long statsT0 = MethodHandleStatics.TRACE_MH_STATS ? System.nanoTime() : 0L;
         MethodHandle mh;
         if (CACHE_ENABLE) {
             Key key = new Key(className, mt, rec);
@@ -663,6 +664,12 @@ public final class StringConcatFactory {
             }
         } else {
             mh = generate(lookup, className, mt, rec);
+        }
+        if (MethodHandleStatics.TRACE_MH_STATS) {
+            long statsT1 = System.nanoTime();
+            MethodHandle adapted = mh.asType(concatType);
+            MHStats.concat(statsT1 - statsT0, System.nanoTime() - statsT1);
+            return new ConstantCallSite(adapted);
         }
         return new ConstantCallSite(mh.asType(concatType));
     }
