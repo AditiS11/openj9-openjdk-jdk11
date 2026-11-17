@@ -1187,10 +1187,10 @@ import static java.lang.invoke.MethodHandleStatics.newInternalError;
         }
     }
 
-    @Override
-    protected void finalize() {
-        if (null != clazz) {
-            MethodHandleNatives.markClassForMemberNamePruning(clazz);
-        }
-    }
+
+
+
+
+
+
 }
