@@ -616,8 +616,16 @@ AC_DEFUN_ONCE([CUSTOM_LATE_HOOK],
   # Create the custom-spec.gmk
   AC_CONFIG_FILES([$OUTPUTDIR/custom-spec.gmk:$CLOSED_AUTOCONF_DIR/custom-spec.gmk.in])
 
-  # explicitly disable classlist generation
-  ENABLE_GENERATE_CLASSLIST=false
+  # Enable classlist and JLI holder class pre-generation by default.
+  # This can be explicitly disabled via --disable-generate-classlist.
+  ENABLE_GENERATE_CLASSLIST=true
+  if test "x$enable_generate_classlist" = xyes ; then
+    ENABLE_GENERATE_CLASSLIST=true
+  elif test "x$enable_generate_classlist" = xno ; then
+    ENABLE_GENERATE_CLASSLIST=false
+  elif test "x$enable_generate_classlist" = x ; then
+    ENABLE_GENERATE_CLASSLIST=true
+  fi
 
   AC_MSG_CHECKING([whether to enable link-time optimization])
   AC_ARG_ENABLE([lto], [AS_HELP_STRING([--enable-lto],
