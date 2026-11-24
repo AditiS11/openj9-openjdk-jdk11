@@ -825,8 +825,17 @@ class LambdaForm {
      * as a sort of pre-invocation linkage step.)
      */
     public void prepare() {
-        if (COMPILE_THRESHOLD == 0 && !forceInterpretation() && !isCompiled) {
-            compileToBytecode();
+        if (!forceInterpretation() && !isCompiled) {
+            if (COMPILE_THRESHOLD == 0) {
+                compileToBytecode();
+            } else {
+                MemberName pregenerated = InvokerBytecodeGenerator.lookupPregeneratedForPrepare(this, methodType());
+                if (pregenerated != null) {
+                    vmentry = pregenerated;
+                    isCompiled = true;
+                    return;
+                }
+            }
         }
         if (this.vmentry != null) {
             // already prepared (e.g., a primitive DMH invoker form)

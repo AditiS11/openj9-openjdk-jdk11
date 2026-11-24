@@ -630,6 +630,14 @@ class InvokerBytecodeGenerator {
         return resolvedMember;
     }
 
+    /**
+     * Accessor to lookupPregenerated for use by LambdaForm.prepare()
+     * to cache the pregenerated MemberName directly and avoid duplicate resolution.
+     */
+    static MemberName lookupPregeneratedForPrepare(LambdaForm form, MethodType invokerType) {
+        return lookupPregenerated(form, invokerType);
+    }
+
     private static MemberName lookupPregenerated(LambdaForm form, MethodType invokerType) {
         if (form.customized != null) {
             // No pre-generated version for customized LF
