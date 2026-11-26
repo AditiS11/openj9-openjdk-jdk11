@@ -638,6 +638,22 @@ class InvokerBytecodeGenerator {
         return lookupPregenerated(form, invokerType);
     }
 
+    /**
+     * Kind-based overload for use by Invokers.callSiteForm() to check for a
+     * pregenerated linker stub BEFORE constructing any LambdaForm objects.
+     * Only handles LINK_TO_CALL_SITE and LINK_TO_TARGET_METHOD since those
+     * are the only kinds whose lookup key is fully determined by kind + invokerType.
+     */
+    static MemberName lookupPregeneratedLinker(LambdaForm.Kind kind, MethodType invokerType) {
+        switch (kind) {
+            case LINK_TO_CALL_SITE:
+            case LINK_TO_TARGET_METHOD:
+                return resolveFrom(kind.methodName, invokerType, Invokers.Holder.class);
+            default:
+                return null;
+        }
+    }
+
     private static MemberName lookupPregenerated(LambdaForm form, MethodType invokerType) {
         if (form.customized != null) {
             // No pre-generated version for customized LF

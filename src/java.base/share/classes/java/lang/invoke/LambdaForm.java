@@ -410,6 +410,22 @@ class LambdaForm {
         return names;
     }
 
+    /** Minimal shell constructor for pregenerated linker forms.
+     *  Used by Invokers.callSiteForm() when a pregenerated stub is found before
+     *  any LambdaForm construction. The vmentry is set directly by the caller.
+     *  isCompiled is set to true here since this form is always backed by a
+     *  pregenerated stub and will never be interpreted.
+     */
+    LambdaForm(Kind kind) {
+        this.arity = 0;
+        this.result = VOID_RESULT;
+        this.names = new Name[0];
+        this.forceInline = true;
+        this.customized = null;
+        this.kind = kind;
+        this.isCompiled = true;
+    }
+
     private LambdaForm(MethodType mt) {
         // Make a blank lambda form, which returns a constant zero or null.
         // It is used as a template for managing the invocation of similar forms that are non-empty.

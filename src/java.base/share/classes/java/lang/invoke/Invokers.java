@@ -528,6 +528,23 @@ class Invokers {
         final int which = (skipCallSite ? MethodTypeForm.LF_MH_LINKER : MethodTypeForm.LF_CS_LINKER);
         LambdaForm lform = mtype.form().cachedLambdaForm(which);
         if (lform != null)  return lform;
+
+        // Before constructing any LambdaForm objects, check if a pregenerated
+        // linker stub already exists in Invokers$Holder. The lookup key for
+        // LINK_TO_TARGET_METHOD and LINK_TO_CALL_SITE is fully determined by
+        // the kind name + invokerFormType, both of which are known here without
+        // building a LambdaForm. If found, skip all Name[] array and LambdaForm
+        // construction entirely.
+        LambdaForm.Kind kind = skipCallSite ? LINK_TO_TARGET_METHOD : LINK_TO_CALL_SITE;
+        MethodType invokerFormType = mtype.appendParameterTypes(skipCallSite ? MethodHandle.class : CallSite.class);
+        MemberName pregenerated = InvokerBytecodeGenerator.lookupPregeneratedLinker(kind, invokerFormType);
+        if (pregenerated != null) {
+            lform = new LambdaForm(kind);
+            lform.vmentry = pregenerated;
+            return mtype.form().setCachedLambdaForm(which, lform);
+        }
+
+        // No pregenerated stub found: fall through to full LambdaForm construction
         // exactInvokerForm (Object,Object)Object
         //   link with java.lang.invoke.MethodHandle.invokeBasic(MethodHandle,Object,Object)Object/invokeSpecial
         final int ARG_BASE     = 0;
@@ -538,7 +555,6 @@ class Invokers {
         final int CSITE_ARG    = skipCallSite ? -1 : APPENDIX_ARG;
         final int CALL_MH      = skipCallSite ? APPENDIX_ARG : nameCursor++;  // result of getTarget
         final int LINKER_CALL  = nameCursor++;
-        MethodType invokerFormType = mtype.appendParameterTypes(skipCallSite ? MethodHandle.class : CallSite.class);
         Name[] names = arguments(nameCursor - INARG_LIMIT, invokerFormType);
         assert(names.length == nameCursor);
         assert(names[APPENDIX_ARG] != null);
@@ -551,8 +567,7 @@ class Invokers {
         System.arraycopy(outArgs, 0, outArgs, PREPEND_COUNT, outArgs.length - PREPEND_COUNT);
         outArgs[PREPEND_MH] = names[CALL_MH];
         names[LINKER_CALL] = new Name(mtype, outArgs);
-        lform = new LambdaForm(INARG_LIMIT, names,
-                (skipCallSite ? LINK_TO_TARGET_METHOD : LINK_TO_CALL_SITE));
+        lform = new LambdaForm(INARG_LIMIT, names, kind);
         lform.compileToBytecode();  // JVM needs a real methodOop
         lform = mtype.form().setCachedLambdaForm(which, lform);
         return lform;
